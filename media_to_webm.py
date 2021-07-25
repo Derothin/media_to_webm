@@ -80,7 +80,7 @@ def get_bitrate(length):
 		return bitrate
 	return DEFAULT_BITRATE
 
-def handle_long_webm(webm, files, bitrate):
+def handle_large_webm(webm, files, bitrate):
 	with open(webm, 'rb') as file:
 		data = bytearray(file.read())
 
@@ -95,21 +95,17 @@ def handle_long_webm(webm, files, bitrate):
 				new_bitrate -= 1 # Just in case, might not actually get used ever. Better than an infinite loop though
 			warning(f"Retrying conversion with lower bitrate ({bitrate} → {new_bitrate})")
 			unlink(webm)
-			convert_to_webm(webm, files, new_bitrate, True)
-	else:
-		duration_index = data.find(DURATION_BYTE_MARKER)
-		data[duration_index:duration_index+7] = FIVE_MINUTE_DURATION
-		with open(webm, 'wb') as file:
-			file.write(data)
+			convert_to_webm(webm, files, new_bitrate)
 
-def convert_to_webm(webm, files, bitrate, long):
+def convert_to_webm(webm, files, bitrate):
 	command = FFMPEG_PATH
 	command += ''.join(f' -i "{filepath}"' for filepath in files)
 	command += f' -c:v libvpx -c:a libvorbis -b:a {bitrate}k "{webm}"'
 	run(command, shell=True, capture_output=True)
-	if long:
-		handle_long_webm(webm, files, bitrate)
-	print("Done")
+	with open(webm, 'rb') as file:
+		data = bytearray(file.read())
+	if len(data) > MAX_FILE_SIZE:
+		handle_large_webm(webm, files, bitrate)
 
 def webm_info(filepath):
 	folder, filename = path.split(filepath)
@@ -164,7 +160,7 @@ if __name__ == '__main__':
 			else:
 				image_file, original_file = files
 
-		if RESIZE_IMAGE:
+		if RESIZE_IMAGE and len(files) == 2:
 			resized = resize(image_file)
 			if resized:
 				filename, extension = path.splitext(image_file)
@@ -177,7 +173,15 @@ if __name__ == '__main__':
 		bitrate = get_bitrate(length)
 		print(f"Bitrate: {bitrate}")
 
-		convert_to_webm(webm_filepath, files, bitrate, length >= MAX_LENGTH)
+		convert_to_webm(webm_filepath, files, bitrate)
+		if length >= MAX_LENGTH:
+			with open(webm_filepath, 'rb') as file:
+				data = bytearray(file.read())
+			duration_index = data.find(DURATION_BYTE_MARKER)
+			data[duration_index:duration_index+7] = FIVE_MINUTE_DURATION
+			with open(webm_filepath, 'wb') as file:
+				file.write(data)
+		print("Done")
 
 		if resized:
 			unlink(new_image_file)
