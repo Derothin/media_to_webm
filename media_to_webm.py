@@ -112,14 +112,7 @@ def webm_info(filepath):
 	webm_filepath = folder + path.sep + path.splitext(filename)[0] + '.webm'
 	return webm_filepath, get_length(filepath)
 
-def resize(filepath):
-	if image_library == 'wand':
-		i = Image(filename=filepath)
-	else:
-		i = Image.open(filepath)
-	side_length = max(i.size)
-	if side_length <= IMAGE_MAX:
-		return False
+def resize(image, image_file, side_length):
 	factor = 1
 	score = 1000000
 	while True:
@@ -131,16 +124,79 @@ def resize(filepath):
 		elif IMAGE_MIN > (side_length // (factor+1)):
 			break
 		factor += 1
-	print(f"Resizing image to {i.width // factor}x{i.height // factor}")
+	print(f"Resizing image to {image.width // factor}x{image.height // factor}")
 	filename, extension = path.splitext(image_file)
-	new_filepath = f"{filename}-resized.{extension}"
+	print(extension)
+	new_filepath = f"{filename}-resized{extension}"
 	if image_library == 'wand':
-		i.resize(i.width // factor, i.height // factor)
-		i.save(filename=new_filepath)
+		image.resize(image.width // factor, image.height // factor)
+		image.save(filename=new_filepath)
 	else:
-		i.resize((i.width // factor, i.height // factor))
-		i.save(new_filepath)
+		image.resize((image.width // factor, image.height // factor))
+		image.save(new_filepath)
+
+def check_resize(filepath):
+	if image_library == 'wand':
+		i = Image(filename=filepath)
+	else:
+		i = Image.open(filepath)
+	side_length = max(i.size)
+	if side_length <= IMAGE_MAX:
+		return False
+	resize(i, filepath, side_length)
 	return True
+
+def die():
+	if USE_COLOURS:
+		colorama.deinit()
+	quit()
+
+def check_resize_embedded(file):
+	audio_file = File(file)
+	if 'audio/mp3' in audio_file.mime:
+		image = audio_file.tags.get('APIC:')
+		if image is None:
+			while (answer := input('No embedded image found. Continue anyway? [y/n] ').lower()) not in 'yn':
+				pass
+			if answer == 'y':
+				return None
+			else:
+				die()
+		image = image.data
+	elif 'audio/flac' in audio_file.mime:
+		if not audio_file.pictures:
+			while (answer := input('No embedded image found. Continue anyway? [y/n] ').lower()) not in 'yn':
+				pass
+			if answer == 'y':
+				return None
+			else:
+				die()
+		image = audio_file.pictures[0].data
+	elif 'audio/aac' in audio_file.mime:
+		image = audio_file.tags.get('covr')
+		if image is None:
+			while (answer := input('No embedded image found. Continue anyway? [y/n] ').lower()) not in 'yn':
+				pass
+			if answer == 'y':
+				return None
+			else:
+				die()
+	else:
+		while (answer := input('No embedded image found. Continue anyway? [y/n] ').lower()) not in 'yn':
+			pass
+		if answer == 'y':
+			return None
+		else:
+			die()
+	
+	image = Image(blob=image)
+	extension = image.mimetype.split('/')[1]
+	side_length = max(image.size)
+	if side_length > IMAGE_MAX:
+		filename = path.splitext(file)[0]
+		resize(image, f'{filename}-image.{extension}', side_length)
+		return f'{filename}-image-resized.{extension}'
+	return False
 
 if __name__ == '__main__':
 	if USE_COLOURS:
@@ -149,7 +205,7 @@ if __name__ == '__main__':
 
 	try:
 		if not len(argv) in {2, 3}:
-			quit()
+			die()
 
 		files = argv[1:]
 		if len(files) == 1:
@@ -160,12 +216,18 @@ if __name__ == '__main__':
 			else:
 				image_file, original_file = files
 
-		if RESIZE_IMAGE and len(files) == 2:
-			resized = resize(image_file)
-			if resized:
-				filename, extension = path.splitext(image_file)
-				new_image_file = f"{filename}-resized.{extension}"
-				files = (original_file, new_image_file)
+		if RESIZE_IMAGE:
+			if len(files) == 1:
+				resized = check_resize_embedded(original_file)
+				if resized:
+					new_image_file = resized
+					files = (original_file, new_image_file)
+			else:
+				resized = check_resize(image_file)
+				if resized:
+					filename, extension = path.splitext(image_file)
+					new_image_file = f"{filename}-resized{extension}"
+					files = (original_file, new_image_file)
 		else:
 			resized = False
 
@@ -192,5 +254,4 @@ if __name__ == '__main__':
 		input()
 	else:
 		sleep(0.8)
-		if USE_COLOURS:
-			colorama.deinit()
+		die()
