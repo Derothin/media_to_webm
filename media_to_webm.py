@@ -151,43 +151,31 @@ def die():
 		colorama.deinit()
 	quit()
 
+def no_embedded_image():
+	while (answer := input('No embedded image found. Continue anyway? [y/n] ').lower()) not in ('y', 'n'):
+		pass
+	if answer == 'y':
+		return None
+	else:
+		die()
+
 def check_resize_embedded(file):
 	audio_file = File(file)
 	if {'audio/mp3', 'audio/wav'} & set(audio_file.mime):
 		image = audio_file.tags.get('APIC:')
 		if image is None:
-			while (answer := input('No embedded image found. Continue anyway? [y/n] ').lower()) not in 'yn':
-				pass
-			if answer == 'y':
-				return None
-			else:
-				die()
+			return no_embedded_image()
 		image = image.data
 	elif 'audio/flac' in audio_file.mime:
 		if not audio_file.pictures:
-			while (answer := input('No embedded image found. Continue anyway? [y/n] ').lower()) not in 'yn':
-				pass
-			if answer == 'y':
-				return None
-			else:
-				die()
+			return no_embedded_image()
 		image = audio_file.pictures[0].data
 	elif 'audio/aac' in audio_file.mime:
 		image = audio_file.tags.get('covr')
 		if image is None:
-			while (answer := input('No embedded image found. Continue anyway? [y/n] ').lower()) not in 'yn':
-				pass
-			if answer == 'y':
-				return None
-			else:
-				die()
+			return no_embedded_image()
 	else:
-		while (answer := input('No embedded image found. Continue anyway? [y/n] ').lower()) not in 'yn':
-			pass
-		if answer == 'y':
-			return None
-		else:
-			die()
+		return no_embedded_image()
 	
 	image = Image(blob=image)
 	extension = image.mimetype.split('/')[1]
