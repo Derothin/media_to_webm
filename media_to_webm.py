@@ -10,7 +10,7 @@ from traceback import print_exc
 # Config
 FFMPEG_PATH = "ffmpeg" # If not in system PATH, use filepath of ffmpeg.exe
 DEFAULT_BITRATE = 256
-AUDIO_FILETYPES = ('flac', 'mp3', 'm4a', 'aac', 'alac', 'ogg')
+AUDIO_FILETYPES = ('flac', 'mp3', 'm4a', 'aac', 'alac', 'ogg', 'wav')
 
 # Colour text using Colorama
 USE_COLOURS = True
@@ -153,7 +153,7 @@ def die():
 
 def check_resize_embedded(file):
 	audio_file = File(file)
-	if 'audio/mp3' in audio_file.mime:
+	if {'audio/mp3', 'audio/wav'} & set(audio_file.mime):
 		image = audio_file.tags.get('APIC:')
 		if image is None:
 			while (answer := input('No embedded image found. Continue anyway? [y/n] ').lower()) not in 'yn':
