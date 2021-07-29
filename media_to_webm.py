@@ -20,6 +20,9 @@ RESIZE_IMAGE = True
 IMAGE_MIN = 400
 IMAGE_MAX = 800
 
+# Force use first embedded MP3 image
+FIRST_IMAGE = True
+
 # Constants
 TO_BITS = 8
 KILOBIT = 1000
@@ -126,7 +129,6 @@ def resize(image, image_file, side_length):
 		factor += 1
 	print(f"Resizing image to {image.width // factor}x{image.height // factor}")
 	filename, extension = path.splitext(image_file)
-	print(extension)
 	new_filepath = f"{filename}-resized{extension}"
 	if image_library == 'wand':
 		image.resize(image.width // factor, image.height // factor)
@@ -184,6 +186,13 @@ def check_resize_embedded(file):
 		filename = path.splitext(file)[0]
 		resize(image, f'{filename}-image.{extension}', side_length)
 		return f'{filename}-image-resized.{extension}'
+	elif FIRST_IMAGE and path.splitext(file)[1] == '.mp3' and 'APIC: ' in audio_file.tags:
+		filename = path.splitext(file)[0]
+		if image_library == 'wand':
+			image.save(filename=f'{filename}-image.{extension}')
+		else:
+			image.save(f'{filename}-image.{extension}')
+		return f'{filename}-image.{extension}'
 	return False
 
 if __name__ == '__main__':
