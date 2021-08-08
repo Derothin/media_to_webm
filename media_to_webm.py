@@ -1,6 +1,7 @@
 from contextlib import suppress
 from math import floor
 from mutagen import File
+from operator import floordiv, mul
 from os import unlink, path
 from subprocess import run
 from sys import argv
@@ -115,27 +116,38 @@ def webm_info(filepath: str) -> tuple[str, int]:
 	webm_filepath = folder + path.sep + path.splitext(filename)[0] + '.webm'
 	return webm_filepath, get_length(filepath)
 
-def resize(image, image_file, side_length):
+def scale(image: Image, side_length: int) -> tuple[int, int]:
 	factor = 1
 	score = 1000000
+	if side_length > IMAGE_MAX:
+		operator = floordiv
+	else:
+		operator = mul
 	while True:
 		if IMAGE_MIN < (side_length // (factor+1)) < IMAGE_MAX:
-			new_score = abs((IMAGE_MAX + IMAGE_MIN)//2 - (side_length // (factor+1)))
+			new_score = abs((IMAGE_MAX + IMAGE_MIN)//2 - operator(side_length, factor+1))
 			if new_score > score:
 				break
 			score = new_score
-		elif IMAGE_MIN > (side_length // (factor+1)):
+		elif IMAGE_MIN > operator(side_length, factor+1):
 			break
 		factor += 1
-	print(f"Resizing image to {image.width // factor}x{image.height // factor}")
+	new_size = (operator(image.width, factor), operator(image.height, factor))
+	if image_library == 'wand':
+		image.resize(*new_size, 'cubic')
+		image.adaptive_sharpen(4, 0.8)
+	else:
+		image.resize(new_size)
+	return new_size
+
 def resize(image: Image, image_file: str, side_length: int) -> None:
 	filename, extension = path.splitext(image_file)
 	new_filepath = f"{filename}-resized{extension}"
+	width, height = scale(image, side_length)
+	print(f"Resized image to {width}x{height}")
 	if image_library == 'wand':
-		image.resize(image.width // factor, image.height // factor)
 		image.save(filename=new_filepath)
 	else:
-		image.resize((image.width // factor, image.height // factor))
 		image.save(new_filepath)
 
 def check_resize(filepath) -> bool:
