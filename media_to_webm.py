@@ -55,13 +55,13 @@ except ImportError:
 	except ImportError:
 		RESIZE_IMAGE = False
 
-def warning(text):
+def warning(text: str) -> None:
 	print(YELLOW+text+WHITE)
 
-def error(text):
+def error(text: str) -> None:
 	print(RED+text+WHITE)
 
-def get_length(file):
+def get_length(file: str) -> int:
 	try:
 		file_info = File(file)
 		return file_info.info.length
@@ -71,7 +71,7 @@ def get_length(file):
 			with suppress(ValueError):
 				return int(l)
 
-def get_bitrate(length):
+def get_bitrate(length: int) -> int:
 	if length * DEFAULT_BITRATE * KILOBIT > MAX_FILE_SIZE * TO_BITS:
 		compression_multiplier = 1 + (0.001*length + 0.2)*length/9800 # Actual file is smaller than the simple calculation assumes, this ups the bitrate to compensate for that
 		bitrate = floor(MAX_FILE_SIZE * TO_BITS / (length * KILOBIT))
@@ -83,7 +83,7 @@ def get_bitrate(length):
 		return bitrate
 	return DEFAULT_BITRATE
 
-def handle_large_webm(webm, files, bitrate):
+def handle_large_webm(webm: str, files: list[str], bitrate: int) -> None:
 	with open(webm, 'rb') as file:
 		data = bytearray(file.read())
 
@@ -100,7 +100,7 @@ def handle_large_webm(webm, files, bitrate):
 			unlink(webm)
 			convert_to_webm(webm, files, new_bitrate)
 
-def convert_to_webm(webm, files, bitrate):
+def convert_to_webm(webm: str, files: list[str], bitrate: int) -> None:
 	command = FFMPEG_PATH
 	command += ''.join(f' -i "{filepath}"' for filepath in files)
 	command += f' -c:v libvpx -c:a libvorbis -b:a {bitrate}k "{webm}"'
@@ -110,7 +110,7 @@ def convert_to_webm(webm, files, bitrate):
 	if len(data) > MAX_FILE_SIZE:
 		handle_large_webm(webm, files, bitrate)
 
-def webm_info(filepath):
+def webm_info(filepath: str) -> tuple[str, int]:
 	folder, filename = path.split(filepath)
 	webm_filepath = folder + path.sep + path.splitext(filename)[0] + '.webm'
 	return webm_filepath, get_length(filepath)
@@ -128,6 +128,7 @@ def resize(image, image_file, side_length):
 			break
 		factor += 1
 	print(f"Resizing image to {image.width // factor}x{image.height // factor}")
+def resize(image: Image, image_file: str, side_length: int) -> None:
 	filename, extension = path.splitext(image_file)
 	new_filepath = f"{filename}-resized{extension}"
 	if image_library == 'wand':
@@ -137,7 +138,7 @@ def resize(image, image_file, side_length):
 		image.resize((image.width // factor, image.height // factor))
 		image.save(new_filepath)
 
-def check_resize(filepath):
+def check_resize(filepath) -> bool:
 	if image_library == 'wand':
 		i = Image(filename=filepath)
 	else:
@@ -148,20 +149,20 @@ def check_resize(filepath):
 	resize(i, filepath, side_length)
 	return True
 
-def die():
+def die() -> None:
 	if USE_COLOURS:
 		colorama.deinit()
 	quit()
 
-def no_embedded_image():
+def no_embedded_image() -> bool:
 	while (answer := input('No embedded image found. Continue anyway? [y/n] ').lower()) not in ('y', 'n'):
 		pass
 	if answer == 'y':
-		return None
+		return False
 	else:
 		die()
 
-def check_resize_embedded(file):
+def check_resize_embedded(file: str) -> str|bool:
 	audio_file = File(file)
 	if {'audio/mp3', 'audio/wav'} & set(audio_file.mime):
 		image = audio_file.tags.get('APIC:')
@@ -218,13 +219,13 @@ if __name__ == '__main__':
 				resized = check_resize_embedded(original_file)
 				if resized:
 					new_image_file = resized
-					files = (original_file, new_image_file)
+					files = [original_file, new_image_file]
 			else:
 				resized = check_resize(image_file)
 				if resized:
 					filename, extension = path.splitext(image_file)
 					new_image_file = f"{filename}-resized{extension}"
-					files = (original_file, new_image_file)
+					files = [original_file, new_image_file]
 		else:
 			resized = False
 
