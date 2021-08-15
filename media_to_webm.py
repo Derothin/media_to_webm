@@ -7,6 +7,7 @@ from subprocess import run
 from sys import argv
 from time import sleep
 from traceback import print_exc
+from typing import Any
 
 # Config
 FFMPEG_PATH = "ffmpeg" # If not in system PATH, use filepath of ffmpeg.exe
@@ -62,6 +63,14 @@ def warning(text: str) -> None:
 def error(text: str) -> None:
 	print(RED+text+WHITE)
 
+def has_tags(file_tags: dict[str: Any], *search_tags) -> bool:
+	return all(tag in file_tags for tag in search_tags)
+
+def die() -> None:
+	if USE_COLOURS:
+		colorama.deinit()
+	quit()
+
 def get_length(file: str) -> int:
 	try:
 		file_info = File(file)
@@ -84,7 +93,20 @@ def get_bitrate(length: int) -> int:
 		return bitrate
 	return DEFAULT_BITRATE
 
-def handle_large_webm(webm: str, files: list[str], bitrate: int) -> None:
+def get_title(file: str) -> str:
+	audio_file = File(file)
+	if {'audio/mp3', 'audio/wav'} & set(audio_file.mime):
+		if has_tags(audio_file.tags, 'TIT2', 'TPE1'):
+			return f"{audio_file.tags['TPE1']} - {audio_file.tags['TIT2']}".replace('"', '\\"')
+	elif 'audio/flac' in audio_file.mime:
+		if has_tags(audio_file, 'title', 'artist'):
+			return f"{audio_file.tags['artist'][0]} - {audio_file.tags['title'][0]}".replace('"', '\\"')
+	elif 'audio/m4a' in audio_file.mime:
+		if has_tags(audio_file.tags, '©nam', '©ART'):
+			return f"{audio_file.tags['©ART']} - {audio_file.tags['©nam']}".replace('"', '\\"')
+	return path.splitext(path.split(file)[1])[0].replace('"', '\\"')
+
+def handle_large_webm(webm: str, files: list[str], bitrate: int, title: str) -> None:
 	with open(webm, 'rb') as file:
 		data = bytearray(file.read())
 
@@ -99,22 +121,17 @@ def handle_large_webm(webm: str, files: list[str], bitrate: int) -> None:
 				new_bitrate -= 1 # Just in case, might not actually get used ever. Better than an infinite loop though
 			warning(f"Retrying conversion with lower bitrate ({bitrate} → {new_bitrate})")
 			unlink(webm)
-			convert_to_webm(webm, files, new_bitrate)
+			convert_to_webm(webm, files, new_bitrate, title)
 
-def convert_to_webm(webm: str, files: list[str], bitrate: int) -> None:
+def convert_to_webm(webm: str, files: list[str], bitrate: int, title: str) -> None:
 	command = FFMPEG_PATH
 	command += ''.join(f' -i "{filepath}"' for filepath in files)
-	command += f' -c:v libvpx -c:a libvorbis -b:a {bitrate}k "{webm}"'
+	command += f' -c:v libvpx -c:a libvorbis -b:a {bitrate}k -metadata title="{title}" "{webm}"'
 	run(command, shell=True, capture_output=True)
 	with open(webm, 'rb') as file:
 		data = bytearray(file.read())
 	if len(data) > MAX_FILE_SIZE:
-		handle_large_webm(webm, files, bitrate)
-
-def webm_info(filepath: str) -> tuple[str, int]:
-	folder, filename = path.split(filepath)
-	webm_filepath = folder + path.sep + path.splitext(filename)[0] + '.webm'
-	return webm_filepath, get_length(filepath)
+		handle_large_webm(webm, files, bitrate, title)
 
 def scale(image: Image, side_length: int) -> tuple[int, int]:
 	factor = 1
@@ -150,7 +167,7 @@ def resize(image: Image, image_file: str, side_length: int) -> None:
 	else:
 		image.save(new_filepath)
 
-def check_resize(filepath) -> bool:
+def check_resize(filepath: str) -> bool:
 	if image_library == 'wand':
 		i = Image(filename=filepath)
 	else:
@@ -160,11 +177,6 @@ def check_resize(filepath) -> bool:
 		return False
 	resize(i, filepath, side_length)
 	return True
-
-def die() -> None:
-	if USE_COLOURS:
-		colorama.deinit()
-	quit()
 
 def no_embedded_image() -> bool:
 	while (answer := input('No embedded image found. Continue anyway? [y/n] ').lower()) not in ('y', 'n'):
@@ -241,11 +253,14 @@ if __name__ == '__main__':
 		else:
 			resized = False
 
-		webm_filepath, length = webm_info(original_file)
+		length = get_length(original_file)
 		bitrate = get_bitrate(length)
 		print(f"Bitrate: {bitrate}")
+		title = get_title(original_file)
+		print(f"Title: {title}")
+		webm_filepath = path.split(original_file)[0] + path.sep + title + '.webm'
 
-		convert_to_webm(webm_filepath, files, bitrate)
+		convert_to_webm(webm_filepath, files, bitrate, title)
 		if length >= MAX_LENGTH:
 			with open(webm_filepath, 'rb') as file:
 				data = bytearray(file.read())
