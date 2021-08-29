@@ -7,7 +7,7 @@ from subprocess import run
 from sys import argv
 from time import sleep
 from traceback import print_exc
-from typing import Any
+from typing import Any, Literal
 
 # Config
 FFMPEG_PATH = "ffmpeg" # If not in system PATH, use filepath of ffmpeg.exe
@@ -63,7 +63,7 @@ def warning(text: str) -> None:
 def error(text: str) -> None:
 	print(RED+text+WHITE)
 
-def has_tags(file_tags: dict[str: Any], *search_tags) -> bool:
+def has_tags(file_tags: dict[str, Any], *search_tags) -> bool:
 	return all(tag in file_tags for tag in search_tags)
 
 def die() -> None:
@@ -178,7 +178,7 @@ def check_resize(filepath: str) -> bool:
 	resize(i, filepath, side_length)
 	return True
 
-def no_embedded_image() -> bool:
+def no_embedded_image() -> Literal[False]:
 	while (answer := input('No embedded image found. Continue anyway? [y/n] ').lower()) not in ('y', 'n'):
 		pass
 	if answer == 'y':
@@ -186,7 +186,7 @@ def no_embedded_image() -> bool:
 	else:
 		die()
 
-def check_resize_embedded(file: str) -> str|bool:
+def check_resize_embedded(file: str) -> str | Literal[False]:
 	audio_file = File(file)
 	if {'audio/mp3', 'audio/wav'} & set(audio_file.mime):
 		image = audio_file.tags.get('APIC:')
@@ -240,9 +240,9 @@ if __name__ == '__main__':
 
 		if RESIZE_IMAGE:
 			if len(files) == 1:
-				resized = check_resize_embedded(original_file)
-				if resized:
-					new_image_file = resized
+				embedded_resized = check_resize_embedded(original_file)
+				if embedded_resized:
+					new_image_file = embedded_resized
 					files = [original_file, new_image_file]
 			else:
 				resized = check_resize(image_file)
