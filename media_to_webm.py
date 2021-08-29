@@ -258,7 +258,7 @@ if __name__ == '__main__':
 		print(f"Bitrate: {bitrate}")
 		title = get_title(original_file)
 		print(f"Title: {title}")
-		webm_filepath = path.split(original_file)[0] + path.sep + title + '.webm'
+		webm_filepath = path.split(original_file)[0] + path.sep + title.replace('/', '-').replace('\\', '-') + '.webm'
 
 		convert_to_webm(webm_filepath, files, bitrate, title)
 		if length >= MAX_LENGTH:
