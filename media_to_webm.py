@@ -238,11 +238,12 @@ if __name__ == '__main__':
 			else:
 				image_file, original_file = files
 
+		resized: bool | str | Literal[False]
 		if RESIZE_IMAGE:
 			if len(files) == 1:
-				embedded_resized = check_resize_embedded(original_file)
-				if embedded_resized:
-					new_image_file = embedded_resized
+				resized = check_resize_embedded(original_file)
+				if resized:
+					new_image_file = resized
 					files = [original_file, new_image_file]
 			else:
 				resized = check_resize(image_file)
