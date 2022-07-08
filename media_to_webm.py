@@ -124,9 +124,8 @@ def handle_large_webm(webm: str, files: list[str], bitrate: int, title: str) -> 
 			convert_to_webm(webm, files, new_bitrate, title)
 
 def convert_to_webm(webm: str, files: list[str], bitrate: int, title: str) -> None:
-	command = FFMPEG_PATH
-	command += ''.join(f' -i "{filepath}"' for filepath in files)
-	command += f' -c:v libvpx -c:a libvorbis -b:a {bitrate}k -metadata title="{title}" "{webm}"'
+	file_args = ''.join(f' -i "{filepath}"' for filepath in files)
+	command = f'{FFMPEG_PATH} {file_args} -c:v libvpx -c:a libvorbis -b:a {bitrate}k -metadata title="{title}" "{webm}"'
 	run(command, shell=True, capture_output=True)
 	with open(webm, 'rb') as file:
 		data = bytearray(file.read())
